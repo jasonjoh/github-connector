@@ -24,9 +24,7 @@ The Microsoft Graph connector experiences that will be enabled in the sample inc
 If you want to enable the [simplified admin experience in the Teams admin center](https://learn.microsoft.com/graph/connecting-external-content-deploy-teams), you will also need the following.
 
 - The [devtunnel CLI](https://learn.microsoft.com/azure/developer/dev-tunnels/get-started) or [ngrok](https://ngrok.com/).
-- [Visual Studio Code](https://code.visualstudio.com) with the [Teams Toolkit extension](https://marketplace.visualstudio.com/items?itemName=TeamsDevApp.ms-teams-vscode-extension)
 - [Custom Teams app uploading](https://learn.microsoft.com/microsoftteams/platform/concepts/build-and-test/prepare-your-o365-tenant#enable-custom-teams-apps-and-turn-on-custom-app-uploading) must be enabled in your Microsoft 365 tenant.
-- An [Azure subscription](https://azure.microsoft.com/free/)
 
 ## Register an app in Azure portal
 
