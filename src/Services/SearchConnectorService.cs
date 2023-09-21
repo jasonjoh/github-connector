@@ -77,6 +77,8 @@ public class SearchConnectorService
         placeholderUserId = !string.IsNullOrEmpty(settings.PlaceholderUserId) ?
             settings.PlaceholderUserId : throw new ArgumentException("placeholderUserId not set in app settings");
 
+        // Create an HttpClient with the Microsoft Graph SDK
+        // middlewares (retry, auth, etc.)
         httpClient = GraphClientFactory.Create();
 
         var credential = new ClientSecretCredential(
@@ -85,7 +87,7 @@ public class SearchConnectorService
         var authProvider = new AzureIdentityAuthenticationProvider(
             credential, scopes: new[] { "https://graph.microsoft.com/.default" });
 
-        graphClient = new GraphServiceClient(httpClient, authProvider);
+        graphClient = new GraphServiceClient(httpClient, authProvider, "https://graph.microsoft.com/beta");
     }
 
     /// <summary>
@@ -95,8 +97,16 @@ public class SearchConnectorService
     /// <param name="name">The display name of the new connection.</param>
     /// <param name="description">The description of the new connection.</param>
     /// <param name="itemType">The item type for the new connection (`issues` or `repos`).</param>
+    /// <param name="connectorTicket">The connector ticket when creating a connection from an M365 app.</param>
+    /// <param name="connectorId">The connector ID when creating a connection from an M365 app.</param>
     /// <returns>The new <see cref="ExternalConnection"/>.</returns>
-    public Task<ExternalConnection?> CreateConnectionAsync(string connectionId, string name, string? description, string itemType)
+    public Task<ExternalConnection?> CreateConnectionAsync(
+        string connectionId,
+        string name,
+        string? description,
+        string itemType,
+        string? connectorTicket = null,
+        string? connectorId = null)
     {
         var newConnection = new ExternalConnection
         {
@@ -123,7 +133,24 @@ public class SearchConnectorService
             },
         };
 
-        return graphClient.External.Connections.PostAsync(newConnection);
+        // Only send the M365 app properties (ConnectorId and GraphConnectors-Ticket header)
+        // if they are both provided, otherwise API call will fail
+        // See https://learn.microsoft.com/graph/connecting-external-content-deploy-teams
+        var useM365Properties = !string.IsNullOrEmpty(connectorTicket) &&
+            !string.IsNullOrEmpty(connectorId);
+
+        if (useM365Properties)
+        {
+            newConnection.ConnectorId = connectorId;
+        }
+
+        return graphClient.External.Connections.PostAsync(newConnection, (config) =>
+        {
+            if (useM365Properties)
+            {
+                config.Headers.Add("GraphConnectors-Ticket", new[] { connectorTicket! });
+            }
+        });
     }
 
     /// <summary>
@@ -140,42 +167,9 @@ public class SearchConnectorService
     /// </summary>
     /// <param name="connectionId">The connection ID of the connection to delete.</param>
     /// <returns>A <see cref="Task"/> indicating the status of the asynchronous delete operation.</returns>
-    public Task DeleteConnectionAsync(string connectionId)
+    public Task DeleteConnectionAsync(string? connectionId)
     {
         return graphClient.External.Connections[connectionId].DeleteAsync();
-    }
-
-    /// <summary>
-    /// Add activity settings to an existing connection.
-    /// </summary>
-    /// <param name="connectionId">The connection ID of the connection to update.</param>
-    /// <param name="itemType">The item type for the connection (`issues` or `repos`).</param>
-    /// <returns>A <see cref="Task"/> indicating the status of the asynchronous update operation.</returns>
-    public Task AddActivitySettingsAsync(string connectionId, string itemType)
-    {
-        var update = new ExternalConnection
-        {
-            ActivitySettings = new()
-            {
-                UrlToItemResolvers = new()
-                {
-                    new ItemIdResolver
-                    {
-                        Priority = 1,
-                        ItemId = itemType == "issues" ? "{issueId}" : "{repo}",
-                        UrlMatchInfo = new()
-                        {
-                            UrlPattern = itemType == "issues" ?
-                                $"/{gitHubOwner}/{gitHubRepo}/issues/(?<issueId>[0-9]+)" :
-                                $"/{gitHubOwner}/(?<repo>.*)/",
-                            BaseUrls = new() { "https://github.com" },
-                        },
-                    },
-                },
-            },
-        };
-
-        return graphClient.External.Connections[connectionId].PatchAsync(update);
     }
 
     /// <summary>
@@ -188,6 +182,12 @@ public class SearchConnectorService
     /// <exception cref="ServiceException">Thrown if the HTTP POST request to register the schema fails.</exception>
     public async Task RegisterSchemaAsync(string connectionId, Schema schema)
     {
+        // This method sends the POST request through the HttpClient,
+        // rather than the Graph SDK. This is because we need access
+        // to the Location header in the response. This header allows
+        // us to check status of the asynchronous schema registration
+        // process.
+
         // Use the Graph SDK's request builder to generate the request URL
         var requestInfo = graphClient.External
             .Connections[connectionId]
@@ -204,9 +204,6 @@ public class SearchConnectorService
 
         // Change method to POST
         requestMessage.Method = HttpMethod.Post;
-
-        // Set required Prefer header
-        // requestMessage.Headers.Add("Prefer", "respond-async");
 
         // Send the request
         var responseMessage = await httpClient.SendAsync(requestMessage) ??
@@ -225,10 +222,14 @@ public class SearchConnectorService
         }
         else
         {
+            // Extract any content
+            var errorContent = await responseMessage.Content.ReadAsStringAsync();
+
             throw new ServiceException(
                 "Registering schema failed",
                 responseMessage.Headers,
-                (int)responseMessage.StatusCode);
+                (int)responseMessage.StatusCode,
+                errorContent);
         }
     }
 
@@ -253,7 +254,10 @@ public class SearchConnectorService
     /// <param name="itemId">The item ID of the item to update.</param>
     /// <param name="activities">The list of activities to add to the item.</param>
     /// <returns>The <see cref="AddActivitiesResponse"/>.</returns>
-    public Task<AddActivitiesResponse?> AddIssueActivitiesAsync(string connectionId, string itemId, List<ExternalActivity> activities)
+    public Task<AddActivitiesResponse?> AddIssueActivitiesAsync(
+        string connectionId,
+        string itemId,
+        List<ExternalActivity> activities)
     {
         var addActivitiesRequest = new AddActivitiesPostRequestBody
         {
@@ -274,6 +278,9 @@ public class SearchConnectorService
     /// <returns>The <see cref="Identity"/> that corresponds to the GitHub login.</returns>
     public Task<Identity> GetIdentityForGitHubUserAsync(string gitHubLogin)
     {
+        // This method simply returns the user ID set in
+        // appsettings.json. A possible improvement would be
+        // to have some mapping of GitHub logins to Azure AD users
         _ = gitHubLogin;
 
         return Task.FromResult(new Identity
@@ -284,7 +291,9 @@ public class SearchConnectorService
     }
 
     private async Task WaitForOperationToCompleteAsync(
-        string connectionId, string operationId, CancellationToken cancellationToken)
+        string connectionId,
+        string operationId,
+        CancellationToken cancellationToken)
     {
         do
         {
@@ -309,7 +318,8 @@ public class SearchConnectorService
                 throw new ServiceException("Schema registration timed out while checking for status.");
             }
 
-            await Task.Delay(5000, cancellationToken);
+            // Check every 30 seconds
+            await Task.Delay(30000, cancellationToken);
         }
         while (true);
     }

@@ -25,17 +25,13 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="7.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="7.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="7.0.0" />
-    <PackageReference Include="Microsoft.Graph.Beta" Version="5.48.0-preview" />
+    <PackageReference Include="Microsoft.Graph.Beta" Version="5.49.0-preview" />
     <PackageReference Include="Octokit" Version="7.1.0" />
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.507">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\msgraph-snippets-dotnet\src\SdkClientLogging\SdkClientLogging.csproj" />
   </ItemGroup>
 
 </Project>

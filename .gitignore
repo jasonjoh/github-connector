@@ -1,3 +1,5 @@
 bin/
 obj/
 appsettings.Development.json
+simplified-admin/manifest.json
+simplified-admin/*.zip

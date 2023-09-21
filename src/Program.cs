@@ -4,24 +4,28 @@
 using System.CommandLine;
 using GitHubConnector;
 using GitHubConnector.Extensions;
+using GitHubConnector.Models;
 using GitHubConnector.Services;
 using Microsoft.Graph;
 using Microsoft.Graph.Beta.Models.ExternalConnectors;
 using Microsoft.Graph.Beta.Models.ODataErrors;
 using Octokit;
 
-var useTeamsAppConfigOption = new Option<bool>(new[] { "--use-teams-app-config", "-t", })
+// Pass this option to run in simplified admin mode.
+// This will setup a webhook on the port specified in appsettings.json to
+// receive signals from the Teams admin center.
+var useSimplifiedAdminOption = new Option<bool>(new[] { "--use-simplified-admin", "-u", })
 {
-    Description = "Run the connector in Teams app config mode.",
+    Description = "Run the connector in simplified admin mode.",
     IsRequired = false,
 };
 
 var command = new RootCommand();
-command.AddOption(useTeamsAppConfigOption);
+command.AddOption(useSimplifiedAdminOption);
 
 command.SetHandler(async (context) =>
 {
-    var useTeamsAppConfig = context.ParseResult.GetValueForOption(useTeamsAppConfigOption);
+    var useSimplifiedAdmin = context.ParseResult.GetValueForOption(useSimplifiedAdminOption);
 
     try
     {
@@ -30,9 +34,10 @@ command.SetHandler(async (context) =>
         var connectorService = new SearchConnectorService(settings);
         var repoService = new RepositoryService(settings);
 
-        if (useTeamsAppConfig)
+        if (useSimplifiedAdmin)
         {
-            await ListenForTeamsAppConfigAsync(connectorService, repoService);
+            var teamsAppConfigService = new M365AppConfigService(settings);
+            await ListenForSimplifiedAdminAsync(connectorService, repoService, teamsAppConfigService);
         }
         else
         {
@@ -47,13 +52,111 @@ command.SetHandler(async (context) =>
 
 Environment.Exit(await command.InvokeAsync(args));
 
-static async Task ListenForTeamsAppConfigAsync(
-    SearchConnectorService connectorService, RepositoryService repoService)
+// Run the application in simplified admin mode.
+static async Task ListenForSimplifiedAdminAsync(
+    SearchConnectorService connectorService,
+    RepositoryService repoService,
+    M365AppConfigService m365AppConfigService)
 {
-    await Task.Delay(1000);
-    throw new NotImplementedException();
+    var listener = m365AppConfigService.Start();
+
+    var keepListening = true;
+    while (keepListening)
+    {
+        try
+        {
+            var context = await listener.GetContextAsync();
+            var request = context.Request;
+            var response = context.Response;
+
+            ConnectorResourceData? connectorData = null;
+            if (request.HttpMethod == "POST")
+            {
+                Console.WriteLine("Received post");
+                // Parse the POST body
+                var changeNotifications = m365AppConfigService.DeserializePostBody(request.InputStream);
+
+                // Ensure the body deserialized into the expected form
+                // and that the validation tokens are valid.
+                if (changeNotifications != null &&
+                    changeNotifications.Value != null &&
+                    await m365AppConfigService.ValidateTokensAsync(changeNotifications.ValidationTokens))
+                {
+                    // Parse the resourceData field
+                    connectorData = ConnectorResourceData.CreateFromAdditionalData(
+                        changeNotifications.Value.First().ResourceData?.AdditionalData);
+                }
+            }
+
+            // Return 202 so Microsoft Graph won't retry notification
+            response.StatusCode = 202;
+            response.Close();
+
+            if (connectorData != null)
+            {
+                // Get any existing connections
+                // Connections associated with the simplified admin experience should
+                // have a connectorId property set to the Teams app ID
+                var connectorId = connectorData.Id ?? throw new ArgumentException(nameof(connectorData.Id));
+                Console.WriteLine($"Checking for existence of connection with connector ID: {connectorId}");
+                var existingConnections = await connectorService.GetConnectionsAsync();
+
+                ExternalConnection? existingConnection = null;
+                if (existingConnections != null && existingConnections.Value?.Count > 0)
+                {
+                    existingConnection = existingConnections.Value?.SingleOrDefault(c => c.ConnectorId == connectorId);
+                }
+
+                Console.WriteLine($"Connection exists? {(existingConnection == null ? "NO" : "YES")}");
+
+                if (connectorData.State == "enabled")
+                {
+                    Console.WriteLine("Request is to create new connection");
+
+                    // Only create if a connection doesn't already exist
+                    if (existingConnection == null)
+                    {
+                        // Create the connection with the connectors ticket
+                        // and connectorId
+                        await connectorService.CreateConnectionAsync(
+                            "GitHubIssuesM365",
+                            "GitHub Issues for M365 App",
+                            "This connector was created by an M365 app",
+                            "issues",
+                            connectorData.ConnectorsTicket,
+                            connectorId);
+                        Console.WriteLine("Created connection successfully");
+
+                        // Register the schema
+                        await connectorService.RegisterSchemaAsync(
+                            "GitHubIssuesM365", SearchConnectorService.IssuesSchema);
+                        Console.WriteLine("Registered schema");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Request is to delete connection");
+                    if (existingConnection != null)
+                    {
+                        // Delete the connection
+                        await connectorService.DeleteConnectionAsync(existingConnection.Id);
+                        Console.WriteLine("Deleted connection successfully");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: {ex.Message}");
+            keepListening = false;
+        }
+    }
+
+    // Stop the HTTP listener
+    m365AppConfigService.Stop();
 }
 
+// Run the app interactively
 static async Task RunInteractivelyAsync(
     SearchConnectorService connectorService, RepositoryService repoService)
 {
