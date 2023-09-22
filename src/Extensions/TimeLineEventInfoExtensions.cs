@@ -46,7 +46,7 @@ public static class TimelineEventInfoExtensions
             Type = timelineEvent.Event.Value == EventInfoState.Commented ?
                 ExternalActivityType.Commented : ExternalActivityType.Modified,
             StartDateTime = timelineEvent.CreatedAt,
-            PerformedBy = await connectorService.GetIdentityForGitHubUserAsync(timelineEvent.Actor.Login),
+            PerformedBy = await connectorService.GetIdentityForGitHubUserAsync(timelineEvent.Actor?.Login),
         };
     }
 }

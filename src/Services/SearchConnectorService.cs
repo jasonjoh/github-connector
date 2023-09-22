@@ -276,7 +276,7 @@ public class SearchConnectorService
     /// </summary>
     /// <param name="gitHubLogin">The GitHub login to look up.</param>
     /// <returns>The <see cref="Identity"/> that corresponds to the GitHub login.</returns>
-    public Task<Identity> GetIdentityForGitHubUserAsync(string gitHubLogin)
+    public Task<Identity> GetIdentityForGitHubUserAsync(string? gitHubLogin)
     {
         // This method simply returns the user ID set in
         // appsettings.json. A possible improvement would be

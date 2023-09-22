@@ -73,6 +73,7 @@ static async Task ListenForSimplifiedAdminAsync(
             if (request.HttpMethod == "POST")
             {
                 Console.WriteLine("Received post");
+
                 // Parse the POST body
                 var changeNotifications = m365AppConfigService.DeserializePostBody(request.InputStream);
 
@@ -223,6 +224,7 @@ static async Task RunInteractivelyAsync(
     catch (Exception ex)
     {
         Console.WriteLine($"ERROR: {ex.Message}");
+        Console.WriteLine(ex.StackTrace);
     }
 }
 

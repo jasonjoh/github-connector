@@ -57,7 +57,7 @@ public static class IssueExtensions
     public static Properties ToProperties(this Issue issue, IReadOnlyList<TimelineEventInfo>? events)
     {
         string lastModifiedBy = events != null && events.Count > 0 ?
-            events[events.Count - 1].Actor.Login : issue.User.Login;
+            events[events.Count - 1].Actor?.Login ?? issue.User.Login : issue.User.Login;
         return new()
         {
             AdditionalData = new Dictionary<string, object>
