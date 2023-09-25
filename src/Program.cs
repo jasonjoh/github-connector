@@ -354,9 +354,21 @@ static async Task PushAllIssuesWithActivitiesAsync(
     using var httpClient = new HttpClient();
     foreach (var issue in issues ?? new List<Issue>())
     {
-        var events = await repoService.GetEventsForIssueWithRetryAsync(issue.Number, 3);
+        IReadOnlyList<TimelineEventInfo>? events = null;
+        try
+        {
+            events = await repoService.GetEventsForIssueWithRetryAsync(issue.Number, 3);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting events for issue #{issue.Number}: {ex.Message}");
+        }
+
+        events = events ?? new List<TimelineEventInfo>();
         var issueItem = await issue.ToExternalItem(events, connectorService);
 
+        // Read the HTML content for the issue, use this to
+        // set the content for the item.
         var response = await httpClient.GetAsync(issue.HtmlUrl);
         if (response.IsSuccessStatusCode)
         {
