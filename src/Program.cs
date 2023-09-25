@@ -351,6 +351,8 @@ static async Task PushAllIssuesWithActivitiesAsync(
         Console.WriteLine($"Error getting issues: {ex.Message}");
     }
 
+    Console.WriteLine($"Found {issues?.Count} issues to push.");
+
     using var httpClient = new HttpClient();
     foreach (var issue in issues ?? new List<Issue>())
     {
@@ -410,6 +412,8 @@ static async Task PushAllRepositoriesAsync(
     {
         Console.WriteLine($"Error getting repositories: {ex.Message}");
     }
+
+    Console.WriteLine($"Found {repositories?.Count} repos to push.");
 
     using var httpClient = new HttpClient();
     foreach (var repository in repositories ?? new List<Repository>())
