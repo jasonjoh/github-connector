@@ -254,21 +254,26 @@ public class SearchConnectorService
     /// <param name="itemId">The item ID of the item to update.</param>
     /// <param name="activities">The list of activities to add to the item.</param>
     /// <returns>The <see cref="AddActivitiesResponse"/>.</returns>
-    public Task<AddActivitiesResponse?> AddIssueActivitiesAsync(
+    public async Task<AddActivitiesResponse?> AddIssueActivitiesAsync(
         string connectionId,
         string itemId,
         List<ExternalActivity> activities)
     {
-        var addActivitiesRequest = new AddActivitiesPostRequestBody
+        if (activities.Count > 0)
         {
-            Activities = activities,
-        };
+            var addActivitiesRequest = new AddActivitiesPostRequestBody
+            {
+                Activities = activities,
+            };
 
-        return graphClient.External
-            .Connections[connectionId]
-            .Items[itemId]
-            .MicrosoftGraphExternalConnectorsAddActivities
-            .PostAsync(addActivitiesRequest);
+            return await graphClient.External
+                .Connections[connectionId]
+                .Items[itemId]
+                .MicrosoftGraphExternalConnectorsAddActivities
+                .PostAsync(addActivitiesRequest);
+        }
+
+        return null;
     }
 
     /// <summary>
