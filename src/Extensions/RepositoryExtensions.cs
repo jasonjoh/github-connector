@@ -21,7 +21,7 @@ public static class RepositoryExtensions
     /// <param name="connectorService">An instance of the <see cref="SearchConnectorService"/> class.</param>
     /// <returns>An instance of <see cref="ExternalItem"/>.</returns>
     public static async Task<ExternalItem> ToExternalItem(
-        this Repository repository, IReadOnlyList<Activity> events, SearchConnectorService connectorService)
+        this Repository repository, IReadOnlyList<Activity>? events, SearchConnectorService connectorService)
     {
         return new ExternalItem
         {
@@ -55,7 +55,7 @@ public static class RepositoryExtensions
     /// <param name="repository">The <see cref="Repository"/> to create from.</param>
     /// <param name="events">A list of activity events for the issue.</param>
     /// <returns>An instance of <see cref="Properties"/>.</returns>
-    public static Properties ToProperties(this Repository repository, IReadOnlyList<Activity> events)
+    public static Properties ToProperties(this Repository repository, IReadOnlyList<Activity>? events)
     {
         string lastModifiedBy = events != null && events.Count > 0 ?
             events[events.Count - 1].Actor.Login : repository.Owner.Login;

@@ -418,7 +418,16 @@ static async Task PushAllRepositoriesAsync(
     using var httpClient = new HttpClient();
     foreach (var repository in repositories ?? new List<Repository>())
     {
-        var events = await repoService.GetEventsForRepoWithRetryAsync(repository.Id, 3);
+        IReadOnlyList<Activity>? events = null;
+        try
+        {
+            events = await repoService.GetEventsForRepoWithRetryAsync(repository.Id, 3);
+        }
+        catch (ApiException ex)
+        {
+            Console.WriteLine($"Error getting events for ${repository.Name}: {ex.Message}");
+        }
+
         var repoItem = await repository.ToExternalItem(events, connectorService);
 
         if (repository.Visibility == RepositoryVisibility.Public)
