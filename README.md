@@ -87,7 +87,14 @@ If you want to enable the [simplified admin experience in the Teams admin center
     dotnet user-secrets set settings:githubToken "YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"
     ```
 
-## Run the application in interactive mode
+## Run the application to create a connection
+
+This sample offers two ways of creating a connection. You can create one interactively, selecting steps from the sample's command line menu, or you can create a connector using the [simplified admin experience in the Teams admin center](https://learn.microsoft.com/graph/connecting-external-content-deploy-teams).
+
+> [!NOTE]
+> You do not have to do use both of these methods - once a connection is created, you can continue to the [Ingest items](#ingest-items) section.
+
+### Create a connection in interactive mode
 
 In this step, you will build and run the sample as an interactive console app. This code sample will create a new connection, register the schema, and then push GitHub repo or issues into that connection.
 
@@ -99,10 +106,10 @@ In this step, you will build and run the sample as an interactive console app. T
     - Select which GitHub content data will be ingested into the connection (repositories or issues).
 1. Select **4. Register schema for current connection** option, and then wait for the operation to complete.
     - Select which schema to use (repositories or issues).
-1. Select **5. Push items to current connection**.
-    - Select which items to push to the current connection (repositories or issues).
 
-## Run the application in simplified admin mode
+The connection is now ready to [ingest items](#ingest-items).
+
+### Create a connection in simplified admin mode
 
 There are additional configuration steps to run the sample in simplified admin mode.
 
@@ -169,8 +176,14 @@ The simplified admin experience in the Teams admin center communicates with the 
 1. Select **Graph Connector**.
 1. Toggle on the **Connection status**.
 
-> [!NOTE]
-> Enabling the connector via the simplified admin experience only creates the connection and registers the schema. You can ingest items via the sample app's interactive mode after the connection is created.
+The connection is now ready to [ingest items](#ingest-items).
+
+## Ingest items
+
+1. Use the command `dotnet run` to run the sample in interactive mode.
+1. Select **2. Select existing connection**. Select the connection you created before.
+1. Select **5. Push items to current connection**.
+    - Select which items to push to the current connection (repositories or issues).
 
 ## Surface the data in Search
 
